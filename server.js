@@ -99,7 +99,8 @@ function createPlayer(id, name) {
     deaths: 0,
     respawnAt: 0,
     damaged: false, // trailing smoke when hp < 40
-    contrail: [] // trail positions
+    contrail: [], // trail positions
+    shieldHp: 0 // absorbs damage before real HP
   };
 }
 
@@ -117,6 +118,7 @@ function respawnPlayer(player) {
   player.damaged = false;
   player.contrail = [];
   player.respawnAt = 0;
+  player.shieldHp = 0;
 }
 
 const POWERUP_TYPES = ['ammo', 'repair', 'speed', 'reargun', 'shield'];
@@ -129,6 +131,15 @@ function spawnPowerup(room) {
     type: POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)],
     id: Math.random().toString(36).slice(2)
   });
+}
+
+function applyDamage(player, amount) {
+  if (player.shieldHp > 0) {
+    const absorbed = Math.min(player.shieldHp, amount);
+    player.shieldHp -= absorbed;
+    amount -= absorbed;
+  }
+  player.hp -= amount;
 }
 
 function distSq(x1, y1, x2, y2) {
@@ -249,6 +260,8 @@ function updateGame(room) {
           p.ammo = Math.min(MAX_AMMO, p.ammo + AMMO_PER_PICKUP);
         } else if (pu.type === 'repair') {
           p.hp = Math.min(MAX_HP, p.hp + 40);
+        } else if (pu.type === 'shield') {
+          p.shieldHp = 50; // absorbs 50 damage before real HP takes hits
         } else {
           p.powerup = pu.type;
           p.powerupEnd = now + POWERUP_DURATION;
@@ -280,7 +293,7 @@ function updateGame(room) {
     for (const p of alivePlayers) {
       if (p.id === b.owner) continue;
       if (distSq(p.x, p.y, b.x, b.y) < (PLANE_SIZE + BULLET_RADIUS) * (PLANE_SIZE + BULLET_RADIUS)) {
-        p.hp -= p.powerup === 'shield' ? Math.floor(BULLET_DAMAGE / 2) : BULLET_DAMAGE;
+        applyDamage(p, BULLET_DAMAGE);
         room.explosions.push({ x: b.x, y: b.y, t: now, size: 'small' });
         // Notify the attacker they hit someone
         const attackerSocket = io.sockets.sockets.get(b.owner);
@@ -311,7 +324,7 @@ function updateGame(room) {
       // Damage nearby planes
       for (const p of alivePlayers) {
         if (distSq(p.x, p.y, bomb.x, bomb.y) < BOMB_RADIUS * BOMB_RADIUS) {
-          p.hp -= p.powerup === 'shield' ? Math.floor(BOMB_DAMAGE / 2) : BOMB_DAMAGE;
+          applyDamage(p, BOMB_DAMAGE);
           // Notify the bomber they hit someone
           if (p.id !== bomb.owner) {
             const attackerSocket = io.sockets.sockets.get(bomb.owner);
@@ -422,7 +435,7 @@ setInterval(() => {
         id: p.id, num: p.num, name: p.name,
         x: p.x, y: p.y, angle: p.angle,
         speed: p.speed, hp: p.hp, alive: p.alive,
-        ammo: p.ammo, powerup: p.powerup,
+        ammo: p.ammo, powerup: p.powerup, shieldHp: p.shieldHp,
         kills: p.kills, deaths: p.deaths,
         damaged: p.damaged,
         contrail: p.contrail.slice(-20) // send last 20 positions

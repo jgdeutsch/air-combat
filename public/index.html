@@ -632,6 +632,23 @@ function drawPlane(p) {
     ctx.globalAlpha = alpha;
   }
 
+  // Shield bubble
+  if (p.shieldHp > 0) {
+    const shieldAlpha = 0.25 + Math.sin(Date.now() / 150) * 0.1;
+    ctx.strokeStyle = '#5ebbff';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = shieldAlpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, 28, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(94,187,255,0.08)';
+    ctx.globalAlpha = 0.15;
+    ctx.beginPath();
+    ctx.arc(0, 0, 28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+  }
+
   ctx.restore();
 
   // Name tag
@@ -653,6 +670,15 @@ function drawPlane(p) {
     const hpRatio = p.hp / 100;
     ctx.fillStyle = hpRatio > 0.5 ? '#4ecdc4' : hpRatio > 0.25 ? '#ffd93d' : '#e94560';
     ctx.fillRect(barX, barY, barW * hpRatio, barH);
+
+    // Shield bar (below HP bar)
+    if (p.shieldHp > 0) {
+      const sBarY = barY + barH + 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(barX - 1, sBarY - 1, barW + 2, barH + 2);
+      ctx.fillStyle = '#5ebbff';
+      ctx.fillRect(barX, sBarY, barW * (p.shieldHp / 50), barH);
+    }
   }
 
   // Dead - spiral indicator
@@ -834,8 +860,11 @@ function drawHUD() {
   const speedPct = Math.round(((me.speed - 2) / 4) * 100);
   document.getElementById('hud-speed').textContent = `THROTTLE: ${speedPct}%`;
 
-  // Active powerup
-  if (me.powerup) {
+  // Active powerup / shield
+  if (me.shieldHp > 0) {
+    document.getElementById('hud-powerup').innerHTML =
+      `<span style="color:#5ebbff">SHIELD: ${me.shieldHp}</span>`;
+  } else if (me.powerup) {
     document.getElementById('hud-powerup').innerHTML =
       `<span style="color:${POWERUP_COLORS[me.powerup]}">${POWERUP_NAMES[me.powerup]}</span>`;
   } else {
@@ -851,9 +880,12 @@ function drawHUD() {
     const barColor = !p.alive ? '#555' : hpRatio > 0.5 ? '#4ecdc4' : hpRatio > 0.25 ? '#ffd93d' : '#e94560';
     const rowClass = (!p.alive ? 'health-dead ' : '') + (isMe ? 'health-row-me' : '');
     const ammoColor = p.ammo > 20 ? '#777' : '#e94560';
-    const buffTag = p.powerup
-      ? `<span style="color:${POWERUP_COLORS[p.powerup]};font-size:0.8em;margin-left:2px">${POWERUP_LABELS[p.powerup]}</span>`
-      : '';
+    let buffTag = '';
+    if (p.shieldHp > 0) {
+      buffTag = `<span style="color:#5ebbff;font-size:0.8em;margin-left:2px">D</span>`;
+    } else if (p.powerup) {
+      buffTag = `<span style="color:${POWERUP_COLORS[p.powerup]};font-size:0.8em;margin-left:2px">${POWERUP_LABELS[p.powerup]}</span>`;
+    }
     healthHtml += `<div class="health-row ${rowClass}">
       ${buffTag}
       <span style="color:${ammoColor};font-size:0.8em;width:22px;text-align:right">${p.ammo}</span>
