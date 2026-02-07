@@ -881,15 +881,24 @@ function gameLoop(now) {
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
-  // Update camera to follow player
-  if (gameState) {
+  // Update camera to follow player (wrap-aware)
+  if (gameState && mapData) {
     const me = gameState.players.find(p => p.id === myId);
     if (me) {
-      // Smooth camera follow
-      const targetX = me.x;
-      const targetY = me.y;
-      cameraX += (targetX - cameraX) * 0.1;
-      cameraY += (targetY - cameraY) * 0.1;
+      let dx = me.x - cameraX;
+      let dy = me.y - cameraY;
+      // Shortest path across wrap boundary
+      if (dx > mapData.w / 2) dx -= mapData.w;
+      if (dx < -mapData.w / 2) dx += mapData.w;
+      if (dy > mapData.h / 2) dy -= mapData.h;
+      if (dy < -mapData.h / 2) dy += mapData.h;
+      cameraX += dx * 0.1;
+      cameraY += dy * 0.1;
+      // Keep camera coords in bounds
+      if (cameraX < 0) cameraX += mapData.w;
+      if (cameraX > mapData.w) cameraX -= mapData.w;
+      if (cameraY < 0) cameraY += mapData.h;
+      if (cameraY > mapData.h) cameraY -= mapData.h;
     }
   }
 
@@ -919,26 +928,6 @@ function gameLoop(now) {
     ctx.beginPath();
     ctx.arc(VIEW_W / 2, VIEW_H / 2, 20, 0, Math.PI * 2);
     ctx.stroke();
-  }
-
-  // Arena boundary warning
-  if (gameState && mapData) {
-    const me = gameState.players.find(p => p.id === myId);
-    if (me) {
-      const margin = 200;
-      const nearEdge = me.x < margin || me.x > mapData.w - margin ||
-                       me.y < margin || me.y > mapData.h - margin;
-      if (nearEdge) {
-        ctx.fillStyle = 'rgba(233,69,96,0.15)';
-        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-        ctx.fillStyle = '#e94560';
-        ctx.font = 'bold 16px system-ui';
-        ctx.textAlign = 'center';
-        ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5;
-        ctx.fillText('APPROACHING BOUNDARY - TURN BACK', VIEW_W / 2, 40);
-        ctx.globalAlpha = 1;
-      }
-    }
   }
 
   requestAnimationFrame(gameLoop);
