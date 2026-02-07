@@ -282,6 +282,11 @@ function updateGame(room) {
       if (distSq(p.x, p.y, b.x, b.y) < (PLANE_SIZE + BULLET_RADIUS) * (PLANE_SIZE + BULLET_RADIUS)) {
         p.hp -= BULLET_DAMAGE;
         room.explosions.push({ x: b.x, y: b.y, t: now, size: 'small' });
+        // Notify the attacker they hit someone
+        const attackerSocket = io.sockets.sockets.get(b.owner);
+        if (attackerSocket) {
+          attackerSocket.emit('hit', { victim: p.name, weapon: 'machinegun', killed: p.hp <= 0 });
+        }
         if (p.hp <= 0) {
           killPlayer(room, p, b.owner, now);
         }
@@ -301,6 +306,13 @@ function updateGame(room) {
       for (const p of alivePlayers) {
         if (distSq(p.x, p.y, bomb.x, bomb.y) < BOMB_RADIUS * BOMB_RADIUS) {
           p.hp -= BOMB_DAMAGE;
+          // Notify the bomber they hit someone
+          if (p.id !== bomb.owner) {
+            const attackerSocket = io.sockets.sockets.get(bomb.owner);
+            if (attackerSocket) {
+              attackerSocket.emit('hit', { victim: p.name, weapon: 'bomb', killed: p.hp <= 0 });
+            }
+          }
           if (p.hp <= 0) {
             killPlayer(room, p, bomb.owner, now);
           }
