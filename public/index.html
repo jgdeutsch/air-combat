@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Air Combat - WW2 Dogfight</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0e1a;
+    color: #eee;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  #lobby {
+    text-align: center;
+    animation: fadeIn 0.5s;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; } }
+  h1 {
+    font-size: 3em;
+    margin-bottom: 0.1em;
+    background: linear-gradient(135deg, #d4a843, #8b6914);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 3px;
+  }
+  h1 span { font-size: 0.4em; display: block; color: #666; -webkit-text-fill-color: #666; letter-spacing: 1px; }
+  .subtitle { color: #888; margin-bottom: 2em; font-size: 1.1em; }
+  input {
+    background: #131929;
+    border: 2px solid #2a3550;
+    color: #eee;
+    padding: 12px 20px;
+    font-size: 1.1em;
+    border-radius: 8px;
+    width: 260px;
+    margin: 5px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: #d4a843; }
+  input::placeholder { color: #555; }
+  button {
+    background: linear-gradient(135deg, #6b4c1e, #8b6914);
+    color: #f0d68a;
+    border: none;
+    padding: 14px 40px;
+    font-size: 1.2em;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: transform 0.1s, box-shadow 0.2s;
+    font-weight: bold;
+    letter-spacing: 2px;
+  }
+  button:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(212,168,67,0.3); }
+  button:active { transform: scale(0.98); }
+  .inputs { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  #game-container { display: none; position: relative; }
+  canvas {
+    border: 2px solid #2a3550;
+    border-radius: 4px;
+    display: block;
+  }
+  #hud {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 0.9em;
+    font-weight: bold;
+    pointer-events: none;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+  }
+  #hud-ammo {
+    position: absolute;
+    bottom: 50px;
+    left: 10px;
+    font-size: 1em;
+    pointer-events: none;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+  }
+  #hud-speed {
+    position: absolute;
+    bottom: 30px;
+    left: 10px;
+    font-size: 0.9em;
+    color: #aaa;
+    pointer-events: none;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+  }
+  #hud-powerup {
+    position: absolute;
+    bottom: 70px;
+    left: 10px;
+    font-size: 0.9em;
+    pointer-events: none;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+  }
+  #message-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.4em;
+    color: #d4a843;
+    text-align: center;
+    pointer-events: none;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    display: none;
+  }
+  #scoreboard {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 0.8em;
+    color: #ccc;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    text-align: right;
+    max-height: 300px;
+    overflow: hidden;
+  }
+  .score-row { margin-bottom: 3px; }
+  .score-me { color: #d4a843; font-weight: bold; }
+  #minimap-container {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    pointer-events: none;
+  }
+  #minimap {
+    border: 1px solid #2a3550;
+    background: rgba(10,14,26,0.8);
+  }
+  .controls-help {
+    color: #555;
+    font-size: 0.85em;
+    margin-top: 20px;
+    line-height: 1.6;
+  }
+  .controls-help kbd {
+    background: #1a2035;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #2a3550;
+    font-family: monospace;
+    color: #d4a843;
+  }
+</style>
+</head>
+<body>
+
+<div id="lobby">
+  <h1>AIR COMBAT<span>WW2 Dogfight Multiplayer</span></h1>
+  <p class="subtitle">Earn your wings. Shoot them down. Rule the sky.</p>
+  <div class="inputs">
+    <input id="name-input" type="text" placeholder="Callsign" maxlength="16" autofocus>
+    <input id="room-input" type="text" placeholder="Squadron (default: public)" maxlength="20">
+    <button id="join-btn" onclick="joinGame()">SCRAMBLE!</button>
+  </div>
+  <p class="controls-help">
+    <kbd>W</kbd>/<kbd>S</kbd> Throttle |
+    <kbd>A</kbd>/<kbd>D</kbd> Bank |
+    <kbd>Click</kbd> or <kbd>Space</kbd> Fire |
+    <kbd>B</kbd> Bomb
+  </p>
+</div>
+
+<div id="game-container">
+  <canvas id="game"></canvas>
+  <div id="hud"></div>
+  <div id="hud-ammo"></div>
+  <div id="hud-speed"></div>
+  <div id="hud-powerup"></div>
+  <div id="message-overlay"></div>
+  <div id="scoreboard"></div>
+  <div id="minimap-container"><canvas id="minimap" width="180" height="135"></canvas></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const miniCanvas = document.getElementById('minimap');
+const miniCtx = miniCanvas.getContext('2d');
+
+// Viewport size
+const VIEW_W = 1200;
+const VIEW_H = 800;
+canvas.width = VIEW_W;
+canvas.height = VIEW_H;
+
+let myId = null;
+let myNum = 0;
+let gameState = null;
+let mapData = null;
+let keys = {};
+let mouseDown = false;
+let message = '';
+let messageTimeout = null;
+let particles = [];
+let cameraX = 0, cameraY = 0;
+
+// Plane color palette (WW2 themed)
+const PLANE_COLORS = [
+  { body: '#4a7c4b', wing: '#3a6c3b', accent: '#2a5c2b' }, // olive
+  { body: '#5b7ba5', wing: '#4b6b95', accent: '#3b5b85' }, // RAF blue
+  { body: '#a0522d', wing: '#8b4513', accent: '#6b3503' }, // brown
+  { body: '#8b8b83', wing: '#7b7b73', accent: '#6b6b63' }, // grey
+  { body: '#c7a951', wing: '#b79941', accent: '#a78931' }, // desert
+  { body: '#4a4a6a', wing: '#3a3a5a', accent: '#2a2a4a' }, // navy
+  { body: '#8b2222', wing: '#7b1212', accent: '#6b0202' }, // red baron
+  { body: '#228b8b', wing: '#127b7b', accent: '#026b6b' }, // teal
+];
+
+function getPlaneColor(num) {
+  return PLANE_COLORS[(num - 1) % PLANE_COLORS.length];
+}
+
+const POWERUP_COLORS = {
+  ammo: '#ffd93d',
+  repair: '#4ecdc4',
+  speed: '#a855f7',
+  reargun: '#ff6b35'
+};
+const POWERUP_LABELS = {
+  ammo: 'A',
+  repair: '+',
+  speed: 'S',
+  reargun: 'R'
+};
+const POWERUP_NAMES = {
+  ammo: 'AMMO RESUPPLY',
+  repair: 'FIELD REPAIR',
+  speed: 'TURBO BOOST',
+  reargun: 'REAR GUNNER'
+};
+
+function joinGame() {
+  const name = document.getElementById('name-input').value.trim() || 'Pilot';
+  const room = document.getElementById('room-input').value.trim() || 'default';
+  socket.emit('join', { name, room });
+  document.getElementById('join-btn').textContent = 'SCRAMBLING...';
+  document.getElementById('join-btn').disabled = true;
+}
+
+document.getElementById('name-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') joinGame();
+});
+document.getElementById('room-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') joinGame();
+});
+
+socket.on('joined', (data) => {
+  myId = data.playerId;
+  myNum = data.playerNum;
+  mapData = data.map;
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('game-container').style.display = 'block';
+  showMessage('Airborne! Engage hostiles!', 2000);
+});
+
+socket.on('full', (data) => {
+  alert(data.message);
+  document.getElementById('join-btn').textContent = 'SCRAMBLE!';
+  document.getElementById('join-btn').disabled = false;
+});
+
+socket.on('playerJoined', (data) => {
+  showMessage(data.name + ' joined (' + data.count + ' pilots)', 2000);
+});
+
+socket.on('playerLeft', (data) => {
+  showMessage(data.name + ' bailed out (' + data.count + ' pilots)', 2000);
+});
+
+socket.on('state', (data) => {
+  gameState = data;
+
+  // Spawn particles from explosions
+  for (const exp of data.explosions) {
+    if (exp.age < 20) {
+      const count = exp.size === 'big' ? 40 : exp.size === 'bomb' ? 50 : 6;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * (exp.size === 'small' ? 2 : 6);
+        particles.push({
+          x: exp.x, y: exp.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.3 + Math.random() * 0.7,
+          maxLife: 0.3 + Math.random() * 0.7,
+          color: ['#ff6b35', '#e94560', '#ffd93d', '#ff8c42', '#fff'][Math.floor(Math.random() * 5)],
+          size: exp.size === 'small' ? 1 + Math.random() * 2 : 2 + Math.random() * 5
+        });
+      }
+    }
+  }
+
+  // Spawn smoke particles for damaged planes
+  for (const p of data.players) {
+    if (p.alive && p.damaged) {
+      if (Math.random() < 0.4) {
+        particles.push({
+          x: p.x - Math.cos(p.angle) * 15 + (Math.random() - 0.5) * 8,
+          y: p.y - Math.sin(p.angle) * 15 + (Math.random() - 0.5) * 8,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: -0.5 - Math.random() * 0.5,
+          life: 0.5 + Math.random() * 0.5,
+          maxLife: 0.5 + Math.random() * 0.5,
+          color: Math.random() < 0.5 ? '#333' : '#555',
+          size: 3 + Math.random() * 4
+        });
+      }
+    }
+  }
+});
+
+function showMessage(msg, duration) {
+  const el = document.getElementById('message-overlay');
+  el.textContent = msg;
+  el.style.display = 'block';
+  if (messageTimeout) clearTimeout(messageTimeout);
+  if (duration > 0) {
+    messageTimeout = setTimeout(() => { el.style.display = 'none'; }, duration);
+  }
+}
+
+// Input handling
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'w' || e.key === 'W') keys.throttleUp = true;
+  if (e.key === 's' || e.key === 'S') keys.throttleDown = true;
+  if (e.key === 'a' || e.key === 'A') keys.left = true;
+  if (e.key === 'd' || e.key === 'D') keys.right = true;
+  if (e.key === ' ') { keys.shoot = true; e.preventDefault(); }
+  if (e.key === 'b' || e.key === 'B') keys.bomb = true;
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'w' || e.key === 'W') keys.throttleUp = false;
+  if (e.key === 's' || e.key === 'S') keys.throttleDown = false;
+  if (e.key === 'a' || e.key === 'A') keys.left = false;
+  if (e.key === 'd' || e.key === 'D') keys.right = false;
+  if (e.key === ' ') keys.shoot = false;
+  if (e.key === 'b' || e.key === 'B') keys.bomb = false;
+});
+
+canvas.addEventListener('mousedown', () => { mouseDown = true; });
+canvas.addEventListener('mouseup', () => { mouseDown = false; });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Send input to server
+setInterval(() => {
+  if (!myId) return;
+  socket.emit('input', {
+    keys: { ...keys, shoot: keys.shoot || mouseDown }
+  });
+}, 1000 / 60);
+
+// ==================== RENDERING ====================
+
+function worldToScreen(wx, wy) {
+  // Handle wrapping for smooth rendering near edges
+  let sx = wx - cameraX;
+  let sy = wy - cameraY;
+  if (mapData) {
+    if (sx > mapData.w / 2) sx -= mapData.w;
+    if (sx < -mapData.w / 2) sx += mapData.w;
+    if (sy > mapData.h / 2) sy -= mapData.h;
+    if (sy < -mapData.h / 2) sy += mapData.h;
+  }
+  return { x: sx + VIEW_W / 2, y: sy + VIEW_H / 2 };
+}
+
+function isOnScreen(sx, sy, margin) {
+  return sx > -margin && sx < VIEW_W + margin && sy > -margin && sy < VIEW_H + margin;
+}
+
+function drawSky() {
+  // Gradient sky
+  const grad = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  grad.addColorStop(0, '#1a2744');
+  grad.addColorStop(0.5, '#243b5e');
+  grad.addColorStop(1, '#1a2744');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  // Grid on ground (gives sense of movement)
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  const gridSize = 100;
+  const offX = -(cameraX % gridSize);
+  const offY = -(cameraY % gridSize);
+  for (let x = offX; x < VIEW_W; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, VIEW_H);
+    ctx.stroke();
+  }
+  for (let y = offY; y < VIEW_H; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(VIEW_W, y);
+    ctx.stroke();
+  }
+}
+
+function drawClouds() {
+  if (!mapData || !mapData.clouds) return;
+  ctx.globalAlpha = 0.08;
+  for (const c of mapData.clouds) {
+    const s = worldToScreen(c.x, c.y);
+    if (!isOnScreen(s.x, s.y, c.r + 50)) continue;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, c.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(s.x - c.r * 0.3, s.y - c.r * 0.2, c.r * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(s.x + c.r * 0.3, s.y + c.r * 0.15, c.r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawContrail(player) {
+  if (!player.contrail || player.contrail.length < 2) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  let first = true;
+  for (let i = 0; i < player.contrail.length; i++) {
+    const s = worldToScreen(player.contrail[i].x, player.contrail[i].y);
+    if (!isOnScreen(s.x, s.y, 100)) { first = true; continue; }
+    ctx.globalAlpha = (i / player.contrail.length) * 0.15;
+    if (first) { ctx.moveTo(s.x, s.y); first = false; }
+    else ctx.lineTo(s.x, s.y);
+  }
+  ctx.globalAlpha = 0.15;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawPlane(p) {
+  const s = worldToScreen(p.x, p.y);
+  if (!isOnScreen(s.x, s.y, 60)) return;
+
+  const colors = getPlaneColor(p.num);
+  const alpha = p.alive ? 1 : 0.3;
+
+  // Draw contrail first
+  drawContrail(p);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(s.x, s.y);
+  ctx.rotate(p.angle);
+
+  // Shadow
+  ctx.save();
+  ctx.translate(4, 4);
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#000';
+  // Fuselage shadow
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Wing shadow
+  ctx.fillRect(-5, -16, 4, 32);
+  ctx.restore();
+
+  // Wings
+  ctx.fillStyle = colors.wing;
+  ctx.fillRect(-6, -18, 5, 36);
+  // Wing tips
+  ctx.fillStyle = colors.accent;
+  ctx.fillRect(-6, -18, 5, 3);
+  ctx.fillRect(-6, 15, 5, 3);
+
+  // Tail
+  ctx.fillStyle = colors.wing;
+  ctx.fillRect(-16, -8, 4, 16);
+
+  // Fuselage
+  ctx.fillStyle = colors.body;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cockpit
+  ctx.fillStyle = '#7ec8e3';
+  ctx.globalAlpha = alpha * 0.8;
+  ctx.beginPath();
+  ctx.ellipse(4, 0, 5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = alpha;
+
+  // Propeller (spinning)
+  const propAngle = (Date.now() / 30) % (Math.PI * 2);
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(18 + Math.cos(propAngle) * 0, Math.sin(propAngle) * 7);
+  ctx.lineTo(18 + Math.cos(propAngle + Math.PI) * 0, Math.sin(propAngle + Math.PI) * 7);
+  ctx.stroke();
+
+  // Muzzle flash when shooting
+  const me = gameState?.players?.find(pp => pp.id === myId);
+  if (p.alive && p.id === myId && (keys.shoot || mouseDown)) {
+    ctx.fillStyle = '#ffd93d';
+    ctx.globalAlpha = 0.5 + Math.random() * 0.5;
+    ctx.beginPath();
+    ctx.arc(20, 0, 3 + Math.random() * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+  }
+
+  // Powerup glow
+  if (p.powerup) {
+    ctx.strokeStyle = POWERUP_COLORS[p.powerup];
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.4 + Math.sin(Date.now() / 100) * 0.3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = alpha;
+  }
+
+  ctx.restore();
+
+  // Name tag
+  ctx.fillStyle = p.id === myId ? '#d4a843' : '#ccc';
+  ctx.font = 'bold 11px system-ui';
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = 0.8;
+  ctx.fillText(p.name, s.x, s.y - 28);
+  ctx.globalAlpha = 1;
+
+  // HP bar
+  if (p.alive) {
+    const barW = 30;
+    const barH = 3;
+    const barX = s.x - barW / 2;
+    const barY = s.y - 23;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+    const hpRatio = p.hp / 100;
+    ctx.fillStyle = hpRatio > 0.5 ? '#4ecdc4' : hpRatio > 0.25 ? '#ffd93d' : '#e94560';
+    ctx.fillRect(barX, barY, barW * hpRatio, barH);
+  }
+
+  // Dead - spiral indicator
+  if (!p.alive) {
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.fillStyle = '#e94560';
+    ctx.font = 'bold 14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 200) * 0.4;
+    ctx.fillText('SHOT DOWN', 0, 5);
+    ctx.restore();
+  }
+}
+
+function drawBullet(b) {
+  const s = worldToScreen(b.x, b.y);
+  if (!isOnScreen(s.x, s.y, 10)) return;
+
+  // Tracer round effect
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 1, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBomb(b) {
+  const s = worldToScreen(b.x, b.y);
+  if (!isOnScreen(s.x, s.y, 20)) return;
+
+  // Pulsing bomb
+  const pulse = 1 + Math.sin(Date.now() / 100) * 0.2;
+  ctx.fillStyle = '#e94560';
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 6 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 3 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Warning ring
+  const progress = b.age / 1000; // 0 to 1
+  ctx.strokeStyle = `rgba(233,69,96,${0.3 + progress * 0.5})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 80 * progress, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawPowerup(pu) {
+  const s = worldToScreen(pu.x, pu.y);
+  if (!isOnScreen(s.x, s.y, 30)) return;
+
+  const t = Date.now() / 500;
+  const bob = Math.sin(t) * 3;
+  const color = POWERUP_COLORS[pu.type];
+
+  ctx.save();
+  ctx.translate(s.x, s.y + bob);
+
+  // Glow
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.15 + Math.sin(t * 2) * 0.1;
+  ctx.beginPath();
+  ctx.arc(0, 0, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Box
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Label
+  ctx.fillStyle = '#0a0e1a';
+  ctx.font = 'bold 12px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(POWERUP_LABELS[pu.type], 0, 0);
+
+  ctx.restore();
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.97;
+    p.vy *= 0.97;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const s = worldToScreen(p.x, p.y);
+    if (!isOnScreen(s.x, s.y, 10)) continue;
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(s.x - p.size / 2, s.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMinimap() {
+  if (!mapData || !gameState) return;
+  const mw = miniCanvas.width;
+  const mh = miniCanvas.height;
+  const scaleX = mw / mapData.w;
+  const scaleY = mh / mapData.h;
+
+  miniCtx.fillStyle = 'rgba(10,14,26,0.85)';
+  miniCtx.fillRect(0, 0, mw, mh);
+
+  // Draw border
+  miniCtx.strokeStyle = '#2a3550';
+  miniCtx.lineWidth = 1;
+  miniCtx.strokeRect(0, 0, mw, mh);
+
+  // Viewport rectangle
+  const me = gameState.players.find(p => p.id === myId);
+  if (me) {
+    miniCtx.strokeStyle = 'rgba(212,168,67,0.4)';
+    miniCtx.lineWidth = 1;
+    const vx = (me.x - VIEW_W / 2) * scaleX;
+    const vy = (me.y - VIEW_H / 2) * scaleY;
+    const vw = VIEW_W * scaleX;
+    const vh = VIEW_H * scaleY;
+    miniCtx.strokeRect(vx, vy, vw, vh);
+  }
+
+  // Powerups
+  for (const pu of gameState.powerups) {
+    miniCtx.fillStyle = POWERUP_COLORS[pu.type];
+    miniCtx.globalAlpha = 0.7;
+    miniCtx.fillRect(pu.x * scaleX - 1, pu.y * scaleY - 1, 3, 3);
+  }
+  miniCtx.globalAlpha = 1;
+
+  // Players
+  for (const p of gameState.players) {
+    if (!p.alive) continue;
+    const px = p.x * scaleX;
+    const py = p.y * scaleY;
+    if (p.id === myId) {
+      miniCtx.fillStyle = '#d4a843';
+      miniCtx.fillRect(px - 2, py - 2, 5, 5);
+    } else {
+      miniCtx.fillStyle = '#e94560';
+      miniCtx.fillRect(px - 1.5, py - 1.5, 4, 4);
+    }
+  }
+}
+
+function drawHUD() {
+  if (!gameState) return;
+  const me = gameState.players.find(p => p.id === myId);
+  if (!me) return;
+
+  // HP display
+  const hpColor = me.hp > 50 ? '#4ecdc4' : me.hp > 25 ? '#ffd93d' : '#e94560';
+  document.getElementById('hud').innerHTML =
+    `<span style="color:${hpColor}">HP: ${Math.max(0, me.hp)}/100</span>`;
+
+  // Ammo
+  const ammoColor = me.ammo > 20 ? '#ccc' : '#e94560';
+  document.getElementById('hud-ammo').innerHTML =
+    `<span style="color:${ammoColor}">AMMO: ${me.ammo}</span>`;
+
+  // Speed indicator
+  const speedPct = Math.round(((me.speed - 2) / 4) * 100);
+  document.getElementById('hud-speed').textContent = `THROTTLE: ${speedPct}%`;
+
+  // Active powerup
+  if (me.powerup) {
+    document.getElementById('hud-powerup').innerHTML =
+      `<span style="color:${POWERUP_COLORS[me.powerup]}">${POWERUP_NAMES[me.powerup]}</span>`;
+  } else {
+    document.getElementById('hud-powerup').innerHTML = '';
+  }
+
+  // Scoreboard
+  const sorted = [...gameState.players].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  let html = '<div style="margin-bottom:4px;color:#888;font-size:0.85em">SCOREBOARD</div>';
+  for (const p of sorted) {
+    const cls = p.id === myId ? 'score-me' : '';
+    const alive = p.alive ? '' : ' [DEAD]';
+    html += `<div class="score-row ${cls}">${p.name}: ${p.kills}K/${p.deaths}D${alive}</div>`;
+  }
+  document.getElementById('scoreboard').innerHTML = html;
+}
+
+let lastTime = performance.now();
+
+function gameLoop(now) {
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
+
+  // Update camera to follow player
+  if (gameState) {
+    const me = gameState.players.find(p => p.id === myId);
+    if (me) {
+      // Smooth camera follow
+      const targetX = me.x;
+      const targetY = me.y;
+      cameraX += (targetX - cameraX) * 0.1;
+      cameraY += (targetY - cameraY) * 0.1;
+    }
+  }
+
+  drawSky();
+  drawClouds();
+
+  if (gameState) {
+    for (const pu of gameState.powerups) drawPowerup(pu);
+    for (const b of gameState.bombs || []) drawBomb(b);
+    for (const b of gameState.bullets) drawBullet(b);
+    for (const p of gameState.players) drawPlane(p);
+    drawHUD();
+    drawMinimap();
+  }
+
+  updateParticles(dt);
+  drawParticles();
+
+  // Crosshair (simple dot)
+  if (myId) {
+    ctx.fillStyle = 'rgba(212,168,67,0.6)';
+    ctx.beginPath();
+    ctx.arc(VIEW_W / 2, VIEW_H / 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(212,168,67,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(VIEW_W / 2, VIEW_H / 2, 20, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Arena boundary warning
+  if (gameState && mapData) {
+    const me = gameState.players.find(p => p.id === myId);
+    if (me) {
+      const margin = 200;
+      const nearEdge = me.x < margin || me.x > mapData.w - margin ||
+                       me.y < margin || me.y > mapData.h - margin;
+      if (nearEdge) {
+        ctx.fillStyle = 'rgba(233,69,96,0.15)';
+        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+        ctx.fillStyle = '#e94560';
+        ctx.font = 'bold 16px system-ui';
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.5;
+        ctx.fillText('APPROACHING BOUNDARY - TURN BACK', VIEW_W / 2, 40);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
