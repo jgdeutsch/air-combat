@@ -359,6 +359,22 @@ socket.on('hit', (data) => {
   setTimeout(() => { if (div.parentNode) div.remove(); }, 1500);
 });
 
+socket.on('gotHit', (data) => {
+  const feed = document.getElementById('hit-feed');
+  const div = document.createElement('div');
+  div.className = 'hit-notif';
+  if (data.killed) {
+    div.style.color = '#e94560';
+    div.style.fontSize = '1.1em';
+    div.textContent = 'KILLED BY ' + data.attacker + (data.weapon === 'bomb' ? ' (BOMB)' : '');
+  } else {
+    div.style.color = '#e97070';
+    div.textContent = 'HIT BY ' + data.attacker;
+  }
+  feed.appendChild(div);
+  setTimeout(() => { if (div.parentNode) div.remove(); }, 1500);
+});
+
 socket.on('state', (data) => {
   gameState = data;
 
@@ -823,7 +839,7 @@ function drawHUD() {
     document.getElementById('hud-powerup').innerHTML = '';
   }
 
-  // Health panel (top right) - shows all players' health
+  // Health panel (top right) - shows all players' health, ammo, and buffs
   const sorted = [...gameState.players].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   let healthHtml = '<div style="margin-bottom:6px;color:#888;font-size:0.85em;text-align:right">PILOTS</div>';
   for (const p of sorted) {
@@ -831,7 +847,13 @@ function drawHUD() {
     const hpRatio = Math.max(0, p.hp) / 100;
     const barColor = !p.alive ? '#555' : hpRatio > 0.5 ? '#4ecdc4' : hpRatio > 0.25 ? '#ffd93d' : '#e94560';
     const rowClass = (!p.alive ? 'health-dead ' : '') + (isMe ? 'health-row-me' : '');
+    const ammoColor = p.ammo > 20 ? '#777' : '#e94560';
+    const buffTag = p.powerup
+      ? `<span style="color:${POWERUP_COLORS[p.powerup]};font-size:0.8em;margin-left:2px">${POWERUP_LABELS[p.powerup]}</span>`
+      : '';
     healthHtml += `<div class="health-row ${rowClass}">
+      ${buffTag}
+      <span style="color:${ammoColor};font-size:0.8em;width:22px;text-align:right">${p.ammo}</span>
       <span class="health-name">${p.name}</span>
       <div class="health-bar-bg"><div class="health-bar-fill" style="width:${hpRatio * 100}%;background:${barColor}"></div></div>
       <span class="health-hp" style="color:${barColor}">${p.alive ? Math.max(0, p.hp) : 'DEAD'}</span>

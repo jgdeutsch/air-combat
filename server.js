@@ -284,8 +284,14 @@ function updateGame(room) {
         room.explosions.push({ x: b.x, y: b.y, t: now, size: 'small' });
         // Notify the attacker they hit someone
         const attackerSocket = io.sockets.sockets.get(b.owner);
+        const attackerPlayer = room.players[b.owner];
         if (attackerSocket) {
           attackerSocket.emit('hit', { victim: p.name, weapon: 'machinegun', killed: p.hp <= 0 });
+        }
+        // Notify the victim they got hit
+        const victimSocket = io.sockets.sockets.get(p.id);
+        if (victimSocket && attackerPlayer) {
+          victimSocket.emit('gotHit', { attacker: attackerPlayer.name, weapon: 'machinegun', killed: p.hp <= 0 });
         }
         if (p.hp <= 0) {
           killPlayer(room, p, b.owner, now);
@@ -309,8 +315,14 @@ function updateGame(room) {
           // Notify the bomber they hit someone
           if (p.id !== bomb.owner) {
             const attackerSocket = io.sockets.sockets.get(bomb.owner);
+            const attackerPlayer = room.players[bomb.owner];
             if (attackerSocket) {
               attackerSocket.emit('hit', { victim: p.name, weapon: 'bomb', killed: p.hp <= 0 });
+            }
+            // Notify the victim they got hit
+            const victimSocket = io.sockets.sockets.get(p.id);
+            if (victimSocket && attackerPlayer) {
+              victimSocket.emit('gotHit', { attacker: attackerPlayer.name, weapon: 'bomb', killed: p.hp <= 0 });
             }
           }
           if (p.hp <= 0) {
