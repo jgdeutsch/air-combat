@@ -681,6 +681,16 @@ function drawPlane(p) {
     }
   }
 
+  // Out of ammo indicator
+  if (p.alive && p.ammo === 0) {
+    ctx.fillStyle = '#e94560';
+    ctx.font = 'bold 9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 300) * 0.4;
+    ctx.fillText('NO AMMO', s.x, s.y + 30);
+    ctx.globalAlpha = 1;
+  }
+
   // Dead - spiral indicator
   if (!p.alive) {
     ctx.save();

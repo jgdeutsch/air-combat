@@ -100,7 +100,8 @@ function createPlayer(id, name) {
     respawnAt: 0,
     damaged: false, // trailing smoke when hp < 40
     contrail: [], // trail positions
-    shieldHp: 0 // absorbs damage before real HP
+    shieldHp: 0, // absorbs damage before real HP
+    shieldEnd: 0
   };
 }
 
@@ -119,9 +120,11 @@ function respawnPlayer(player) {
   player.contrail = [];
   player.respawnAt = 0;
   player.shieldHp = 0;
+  player.shieldEnd = 0;
 }
 
-const POWERUP_TYPES = ['ammo', 'repair', 'speed', 'reargun', 'shield'];
+// Shield appears less often (1 in 8 vs 2 in 8 for others)
+const POWERUP_TYPES = ['ammo', 'ammo', 'repair', 'repair', 'speed', 'speed', 'reargun', 'shield'];
 
 function spawnPowerup(room) {
   const x = 100 + Math.random() * (MAP_W - 200);
@@ -171,6 +174,11 @@ function updateGame(room) {
     // Expire powerups
     if (p.powerup && now > p.powerupEnd) {
       p.powerup = null;
+    }
+    // Expire shield
+    if (p.shieldHp > 0 && p.shieldEnd > 0 && now > p.shieldEnd) {
+      p.shieldHp = 0;
+      p.shieldEnd = 0;
     }
 
     // Throttle
@@ -261,7 +269,8 @@ function updateGame(room) {
         } else if (pu.type === 'repair') {
           p.hp = Math.min(MAX_HP, p.hp + 40);
         } else if (pu.type === 'shield') {
-          p.shieldHp = 25; // absorbs 25 damage before real HP takes hits
+          p.shieldHp = 25;
+          p.shieldEnd = now + 6000; // 6 second time limit
         } else {
           p.powerup = pu.type;
           p.powerupEnd = now + POWERUP_DURATION;
