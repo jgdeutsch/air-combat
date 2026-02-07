@@ -261,7 +261,7 @@ function updateGame(room) {
         } else if (pu.type === 'repair') {
           p.hp = Math.min(MAX_HP, p.hp + 40);
         } else if (pu.type === 'shield') {
-          p.shieldHp = 50; // absorbs 50 damage before real HP takes hits
+          p.shieldHp = 25; // absorbs 25 damage before real HP takes hits
         } else {
           p.powerup = pu.type;
           p.powerupEnd = now + POWERUP_DURATION;
