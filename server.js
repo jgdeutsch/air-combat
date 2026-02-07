@@ -119,7 +119,7 @@ function respawnPlayer(player) {
   player.respawnAt = 0;
 }
 
-const POWERUP_TYPES = ['ammo', 'repair', 'speed', 'reargun'];
+const POWERUP_TYPES = ['ammo', 'repair', 'speed', 'reargun', 'shield'];
 
 function spawnPowerup(room) {
   const x = 100 + Math.random() * (MAP_W - 200);
@@ -280,7 +280,7 @@ function updateGame(room) {
     for (const p of alivePlayers) {
       if (p.id === b.owner) continue;
       if (distSq(p.x, p.y, b.x, b.y) < (PLANE_SIZE + BULLET_RADIUS) * (PLANE_SIZE + BULLET_RADIUS)) {
-        p.hp -= BULLET_DAMAGE;
+        p.hp -= p.powerup === 'shield' ? Math.floor(BULLET_DAMAGE / 2) : BULLET_DAMAGE;
         room.explosions.push({ x: b.x, y: b.y, t: now, size: 'small' });
         // Notify the attacker they hit someone
         const attackerSocket = io.sockets.sockets.get(b.owner);
@@ -311,7 +311,7 @@ function updateGame(room) {
       // Damage nearby planes
       for (const p of alivePlayers) {
         if (distSq(p.x, p.y, bomb.x, bomb.y) < BOMB_RADIUS * BOMB_RADIUS) {
-          p.hp -= BOMB_DAMAGE;
+          p.hp -= p.powerup === 'shield' ? Math.floor(BOMB_DAMAGE / 2) : BOMB_DAMAGE;
           // Notify the bomber they hit someone
           if (p.id !== bomb.owner) {
             const attackerSocket = io.sockets.sockets.get(bomb.owner);
